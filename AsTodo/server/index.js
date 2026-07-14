@@ -1,167 +1,266 @@
 const express = require('express');
 const { WebSocketServer } = require('ws');
-const Database = require('better-sqlite3');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+const DB_PATH = path.join(os.homedir(), '.astodo.json');
 
-// DB setup
-const db = new Database(path.join(os.homedir(), '.astodo.db'));
+function readDB() {
+  try {
+    if (!fs.existsSync(DB_PATH)) return defaultDB();
+    const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    data.tasks = (data.tasks || []).map(t => ({
+      subtasks: [], due_date: null, reminder: null, recur: null, order: 0, ...t
+    }));
+    return data;
+  } catch { return defaultDB(); }
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    type TEXT DEFAULT 'note',
-    priority TEXT DEFAULT 'medium',
-    status TEXT DEFAULT 'todo',
-    project TEXT DEFAULT 'General',
-    tags TEXT DEFAULT '[]',
-    ai_suggestion TEXT DEFAULT '',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    completed_at TEXT
-  );
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    color TEXT DEFAULT '#6366f1',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-  INSERT OR IGNORE INTO projects (name, color) VALUES ('General', '#6366f1');
-`);
+function defaultDB() {
+  return {
+    tasks: [],
+    projects: [{ id: 1, name: 'General', color: '#6366f1', created_at: new Date().toISOString() }],
+    activity: {},
+    nextTaskId: 1,
+    nextProjectId: 2
+  };
+}
+
+function writeDB(data) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+}
+
+if (!fs.existsSync(DB_PATH)) writeDB(readDB());
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Broadcast to all connected clients
 function broadcast(data) {
   const msg = JSON.stringify(data);
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) client.send(msg);
-  });
+  wss.clients.forEach(c => { if (c.readyState === 1) c.send(msg); });
 }
 
-// ─── Tasks API ───────────────────────────────────────────────
+function recordActivity(db) {
+  const today = new Date().toISOString().split('T')[0];
+  db.activity = db.activity || {};
+  db.activity[today] = (db.activity[today] || 0) + 1;
+}
+
+// ── Tasks ──────────────────────────────────────────────────────
 app.get('/api/tasks', (req, res) => {
+  const db = readDB();
   const { project, type, status, priority, search } = req.query;
-  let query = 'SELECT * FROM tasks WHERE 1=1';
-  const params = [];
-
-  if (project) { query += ' AND project = ?'; params.push(project); }
-  if (type) { query += ' AND type = ?'; params.push(type); }
-  if (status) { query += ' AND status = ?'; params.push(status); }
-  if (priority) { query += ' AND priority = ?'; params.push(priority); }
-  if (search) { query += ' AND (title LIKE ? OR description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
-
-  query += ' ORDER BY CASE priority WHEN "urgent" THEN 1 WHEN "high" THEN 2 WHEN "medium" THEN 3 WHEN "low" THEN 4 END, created_at DESC';
-
-  const tasks = db.prepare(query).all(...params);
-  res.json(tasks.map(t => ({ ...t, tags: JSON.parse(t.tags || '[]') })));
+  let tasks = [...db.tasks];
+  if (project) tasks = tasks.filter(t => t.project === project);
+  if (type) tasks = tasks.filter(t => t.type === type);
+  if (status) tasks = tasks.filter(t => t.status === status);
+  if (priority) tasks = tasks.filter(t => t.priority === priority);
+  if (search) tasks = tasks.filter(t =>
+    t.title.toLowerCase().includes(search.toLowerCase()) ||
+    (t.description || '').toLowerCase().includes(search.toLowerCase())
+  );
+  tasks.sort((a, b) => (a.order || 0) - (b.order || 0) || new Date(b.created_at) - new Date(a.created_at));
+  res.json(tasks);
 });
 
 app.post('/api/tasks', (req, res) => {
-  const { title, description = '', type = 'note', priority = 'medium', status = 'todo', project = 'General', tags = [], ai_suggestion = '' } = req.body;
-  const result = db.prepare(
-    'INSERT INTO tasks (title, description, type, priority, status, project, tags, ai_suggestion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(title, description, type, priority, status, project, JSON.stringify(tags), ai_suggestion);
-
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
-  const parsed = { ...task, tags: JSON.parse(task.tags || '[]') };
-  broadcast({ event: 'task:created', data: parsed });
-  res.json(parsed);
+  const db = readDB();
+  const task = {
+    id: db.nextTaskId++,
+    title: req.body.title,
+    description: req.body.description || '',
+    type: req.body.type || 'note',
+    priority: req.body.priority || 'medium',
+    status: req.body.status || 'todo',
+    project: req.body.project || 'General',
+    tags: req.body.tags || [],
+    ai_suggestion: req.body.ai_suggestion || '',
+    subtasks: req.body.subtasks || [],
+    due_date: req.body.due_date || null,
+    reminder: req.body.reminder || null,
+    recur: req.body.recur || null,
+    order: db.tasks.length,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    completed_at: null
+  };
+  db.tasks.unshift(task);
+  writeDB(db);
+  broadcast({ event: 'task:created', data: task });
+  res.json(task);
 });
 
 app.put('/api/tasks/:id', (req, res) => {
-  const { title, description, type, priority, status, project, tags, ai_suggestion } = req.body;
-  const completedAt = status === 'done' ? new Date().toISOString() : null;
-
-  db.prepare(`
-    UPDATE tasks SET
-      title = COALESCE(?, title),
-      description = COALESCE(?, description),
-      type = COALESCE(?, type),
-      priority = COALESCE(?, priority),
-      status = COALESCE(?, status),
-      project = COALESCE(?, project),
-      tags = COALESCE(?, tags),
-      ai_suggestion = COALESCE(?, ai_suggestion),
-      completed_at = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(title, description, type, priority, status, project, tags ? JSON.stringify(tags) : null, ai_suggestion, completedAt, req.params.id);
-
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-  const parsed = { ...task, tags: JSON.parse(task.tags || '[]') };
-  broadcast({ event: 'task:updated', data: parsed });
-  res.json(parsed);
+  const db = readDB();
+  const id = parseInt(req.params.id);
+  const idx = db.tasks.findIndex(t => t.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  const task = db.tasks[idx];
+  const fields = ['title','description','type','priority','status','project','tags','ai_suggestion','subtasks','due_date','reminder','recur','order'];
+  fields.forEach(f => { if (req.body[f] !== undefined) task[f] = req.body[f]; });
+  task.updated_at = new Date().toISOString();
+  if (req.body.status === 'done' && !task.completed_at) {
+    task.completed_at = new Date().toISOString();
+    recordActivity(db);
+    // handle recurrence
+    if (task.recur) {
+      const newTask = { ...task, id: db.nextTaskId++, status: 'todo', completed_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      const d = new Date(task.due_date || new Date());
+      if (task.recur === 'daily') d.setDate(d.getDate() + 1);
+      if (task.recur === 'weekly') d.setDate(d.getDate() + 7);
+      if (task.recur === 'monthly') d.setMonth(d.getMonth() + 1);
+      newTask.due_date = d.toISOString();
+      db.tasks.unshift(newTask);
+      broadcast({ event: 'task:created', data: newTask });
+    }
+  }
+  if (req.body.status && req.body.status !== 'done') task.completed_at = null;
+  db.tasks[idx] = task;
+  writeDB(db);
+  broadcast({ event: 'task:updated', data: task });
+  res.json(task);
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
-  broadcast({ event: 'task:deleted', data: { id: req.params.id } });
+  const db = readDB();
+  db.tasks = db.tasks.filter(t => t.id !== parseInt(req.params.id));
+  writeDB(db);
+  broadcast({ event: 'task:deleted', data: { id: parseInt(req.params.id) } });
   res.json({ ok: true });
 });
 
-// ─── Projects API ─────────────────────────────────────────────
+// reorder
+app.post('/api/tasks/reorder', (req, res) => {
+  const db = readDB();
+  const { ids } = req.body;
+  ids.forEach((id, i) => {
+    const t = db.tasks.find(t => t.id === id);
+    if (t) t.order = i;
+  });
+  writeDB(db);
+  broadcast({ event: 'tasks:reordered', data: { ids } });
+  res.json({ ok: true });
+});
+
+// ── Projects ───────────────────────────────────────────────────
 app.get('/api/projects', (req, res) => {
-  const projects = db.prepare('SELECT p.*, COUNT(t.id) as task_count FROM projects p LEFT JOIN tasks t ON t.project = p.name GROUP BY p.id').all();
-  res.json(projects);
+  const db = readDB();
+  res.json(db.projects.map(p => ({
+    ...p,
+    task_count: db.tasks.filter(t => t.project === p.name && t.status !== 'done').length
+  })));
 });
 
 app.post('/api/projects', (req, res) => {
+  const db = readDB();
   const { name, color = '#6366f1' } = req.body;
-  const result = db.prepare('INSERT OR IGNORE INTO projects (name, color) VALUES (?, ?)').run(name, color);
-  const project = db.prepare('SELECT * FROM projects WHERE name = ?').get(name);
+  if (db.projects.find(p => p.name === name)) return res.json(db.projects.find(p => p.name === name));
+  const project = { id: db.nextProjectId++, name, color, created_at: new Date().toISOString() };
+  db.projects.push(project);
+  writeDB(db);
   broadcast({ event: 'project:created', data: project });
   res.json(project);
 });
 
 app.delete('/api/projects/:name', (req, res) => {
+  const db = readDB();
   if (req.params.name === 'General') return res.status(400).json({ error: 'Cannot delete General' });
-  db.prepare("UPDATE tasks SET project = 'General' WHERE project = ?").run(req.params.name);
-  db.prepare('DELETE FROM projects WHERE name = ?').run(req.params.name);
+  db.tasks.forEach(t => { if (t.project === req.params.name) t.project = 'General'; });
+  db.projects = db.projects.filter(p => p.name !== req.params.name);
+  writeDB(db);
   broadcast({ event: 'project:deleted', data: { name: req.params.name } });
   res.json({ ok: true });
 });
 
-// ─── Stats API ─────────────────────────────────────────────────
+// ── Stats + Activity ───────────────────────────────────────────
 app.get('/api/stats', (req, res) => {
-  const total = db.prepare('SELECT COUNT(*) as c FROM tasks').get().c;
-  const done = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'").get().c;
-  const urgent = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE priority = 'urgent' AND status != 'done'").get().c;
-  const byType = db.prepare("SELECT type, COUNT(*) as count FROM tasks WHERE status != 'done' GROUP BY type").all();
-  const recent = db.prepare("SELECT * FROM tasks ORDER BY created_at DESC LIMIT 5").all();
-  res.json({ total, done, urgent, byType, recent: recent.map(t => ({ ...t, tags: JSON.parse(t.tags || '[]') })) });
+  const db = readDB();
+  const tasks = db.tasks;
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const urgent = tasks.filter(t => t.priority === 'urgent' && t.status !== 'done').length;
+  const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
+
+  // last 14 days activity
+  const activity = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    activity.push({ date: key, count: db.activity?.[key] || 0 });
+  }
+
+  // streak
+  let streak = 0;
+  const today = new Date().toISOString().split('T')[0];
+  let check = new Date();
+  while (true) {
+    const key = check.toISOString().split('T')[0];
+    if (db.activity?.[key] > 0) { streak++; check.setDate(check.getDate() - 1); }
+    else break;
+    if (streak > 365) break;
+  }
+
+  // by type
+  const byType = ['feature','bug','note','improve'].map(type => ({
+    type, count: tasks.filter(t => t.type === type && t.status !== 'done').length
+  }));
+
+  res.json({ total, done, urgent, overdue, activity, streak, byType });
 });
 
-// WebSocket connection
-wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ event: 'connected', data: { message: 'AsTodo server connected' } }));
+// ── Export ─────────────────────────────────────────────────────
+app.get('/api/export/json', (req, res) => {
+  const db = readDB();
+  res.setHeader('Content-Disposition', 'attachment; filename=astodo-export.json');
+  res.json(db.tasks);
 });
 
-// Get local IP
+app.get('/api/export/markdown', (req, res) => {
+  const db = readDB();
+  const lines = ['# AsTodo Export\n', `Generated: ${new Date().toLocaleDateString()}\n`];
+  const groups = {};
+  db.tasks.forEach(t => {
+    if (!groups[t.project]) groups[t.project] = [];
+    groups[t.project].push(t);
+  });
+  Object.entries(groups).forEach(([proj, tasks]) => {
+    lines.push(`\n## ${proj}\n`);
+    tasks.forEach(t => {
+      const check = t.status === 'done' ? '[x]' : '[ ]';
+      lines.push(`- ${check} **${t.title}** \`${t.type}\` \`${t.priority}\``);
+      if (t.description) lines.push(`  > ${t.description}`);
+      if (t.due_date) lines.push(`  📅 Due: ${new Date(t.due_date).toLocaleDateString()}`);
+      (t.subtasks || []).forEach(s => lines.push(`  - ${s.done ? '[x]' : '[ ]'} ${s.title}`));
+    });
+  });
+  res.setHeader('Content-Disposition', 'attachment; filename=astodo-export.md');
+  res.setHeader('Content-Type', 'text/markdown');
+  res.send(lines.join('\n'));
+});
+
+wss.on('connection', ws => {
+  ws.send(JSON.stringify({ event: 'connected' }));
+});
+
 function getLocalIP() {
   const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
+  for (const name of Object.keys(nets))
+    for (const net of nets[name])
       if (net.family === 'IPv4' && !net.internal) return net.address;
-    }
-  }
   return 'localhost';
 }
 
 const PORT = 3131;
 server.listen(PORT, '0.0.0.0', () => {
   const ip = getLocalIP();
-  console.log(`\n🚀 AsTodo Server running!`);
-  console.log(`📱 iPhone URL: http://${ip}:${PORT}`);
-  console.log(`🖥️  Mac URL:   http://localhost:${PORT}\n`);
+  console.log(`\n✦ AsTodo Server running!\n`);
+  console.log(`📱 iPhone: http://${ip}:${PORT}`);
+  console.log(`🖥️  Mac:    http://localhost:${PORT}\n`);
 });
