@@ -16,7 +16,7 @@ function readDB() {
     if (!fs.existsSync(DB_PATH)) return defaultDB();
     const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
     data.tasks = (data.tasks || []).map(t => ({
-      subtasks: [], due_date: null, reminder: null, recur: null, order: 0, ...t
+      subtasks: [], due_date: null, reminder: null, recur: null, order: 0, importance: 8, ...t
     }));
     return data;
   } catch { return defaultDB(); }
@@ -53,6 +53,13 @@ function recordActivity(db) {
   db.activity[today] = (db.activity[today] || 0) + 1;
 }
 
+const IMPORTANCE_BY_PRIORITY = { urgent: 18, high: 13, medium: 8, low: 3 };
+function clampImportance(v, fallbackPriority) {
+  const n = parseInt(v, 10);
+  if (!isNaN(n) && n >= 1 && n <= 20) return n;
+  return IMPORTANCE_BY_PRIORITY[fallbackPriority] || 8;
+}
+
 // ── Tasks ──────────────────────────────────────────────────────
 app.get('/api/tasks', (req, res) => {
   const db = readDB();
@@ -87,6 +94,7 @@ app.post('/api/tasks', (req, res) => {
     reminder: req.body.reminder || null,
     recur: req.body.recur || null,
     order: db.tasks.length,
+    importance: clampImportance(req.body.importance, req.body.priority || 'medium'),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     completed_at: null
@@ -103,8 +111,12 @@ app.put('/api/tasks/:id', (req, res) => {
   const idx = db.tasks.findIndex(t => t.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const task = db.tasks[idx];
-  const fields = ['title','description','type','priority','status','project','tags','ai_suggestion','subtasks','due_date','reminder','recur','order'];
-  fields.forEach(f => { if (req.body[f] !== undefined) task[f] = req.body[f]; });
+  const fields = ['title','description','type','priority','status','project','tags','ai_suggestion','subtasks','due_date','reminder','recur','order','importance'];
+  fields.forEach(f => {
+    if (req.body[f] !== undefined) {
+      task[f] = f === 'importance' ? clampImportance(req.body[f], req.body.priority || task.priority) : req.body[f];
+    }
+  });
   task.updated_at = new Date().toISOString();
   if (req.body.status === 'done' && !task.completed_at) {
     task.completed_at = new Date().toISOString();
