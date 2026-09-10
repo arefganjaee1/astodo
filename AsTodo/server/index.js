@@ -16,7 +16,7 @@ function readDB() {
     if (!fs.existsSync(DB_PATH)) return defaultDB();
     const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
     data.tasks = (data.tasks || []).map(t => ({
-      subtasks: [], due_date: null, reminder: null, recur: null, order: 0, importance: 8, ...t
+      subtasks: [], due_date: null, reminder: null, recur: null, order: 0, importance: 8, habit: false, habitCount: 0, ...t
     }));
     return data;
   } catch { return defaultDB(); }
@@ -95,6 +95,8 @@ app.post('/api/tasks', (req, res) => {
     recur: req.body.recur || null,
     order: db.tasks.length,
     importance: clampImportance(req.body.importance, req.body.priority || 'medium'),
+    habit: !!req.body.habit,
+    habitCount: Math.max(0, parseInt(req.body.habitCount, 10) || 0),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     completed_at: null
@@ -111,10 +113,13 @@ app.put('/api/tasks/:id', (req, res) => {
   const idx = db.tasks.findIndex(t => t.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const task = db.tasks[idx];
-  const fields = ['title','description','type','priority','status','project','tags','ai_suggestion','subtasks','due_date','reminder','recur','order','importance'];
+  const fields = ['title','description','type','priority','status','project','tags','ai_suggestion','subtasks','due_date','reminder','recur','order','importance','habit','habitCount'];
   fields.forEach(f => {
     if (req.body[f] !== undefined) {
-      task[f] = f === 'importance' ? clampImportance(req.body[f], req.body.priority || task.priority) : req.body[f];
+      if (f === 'importance') task[f] = clampImportance(req.body[f], req.body.priority || task.priority);
+      else if (f === 'habitCount') task[f] = Math.max(0, parseInt(req.body[f], 10) || 0);
+      else if (f === 'habit') task[f] = !!req.body[f];
+      else task[f] = req.body[f];
     }
   });
   task.updated_at = new Date().toISOString();

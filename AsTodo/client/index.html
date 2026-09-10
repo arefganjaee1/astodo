@@ -179,6 +179,8 @@
     .aih{background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.15);border-radius:6px;padding:5px 9px;margin-top:5px;margin-left:27px;font-size:11px;color:var(--accent2);line-height:1.4}
     .aih::before{content:'✦ '}
     .recur-badge{font-size:10px;padding:2px 6px;border-radius:20px;background:rgba(124,106,247,.1);color:var(--accent2)}
+    .habit-btn{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(124,106,247,.14);color:var(--accent2);border:1px solid rgba(124,106,247,.3);cursor:pointer;font-weight:600}
+    .habit-btn:active{transform:scale(.94)}
 
     /* Empty */
     .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:9px;color:var(--text3);padding:40px;text-align:center}
@@ -273,6 +275,9 @@
     .det-tb{display:flex;align-items:center;gap:6px;margin-bottom:11px;flex-wrap:wrap}
     .det-title{font-size:20px;font-weight:700;line-height:1.3;margin-bottom:8px}
     .det-desc{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px;white-space:pre-wrap}
+    .habit-box{background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+    .habit-box>div{font-size:12.5px;color:var(--text2);line-height:1.5}
+    .habit-box .btn{align-self:flex-start}
     .det-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
     .det-mi label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px}
     .det-mi span{font-size:13px}
@@ -504,9 +509,16 @@
         <button class="pbtn low" onclick="selP('low',this)">↓ Low</button>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg" id="imp-fg">
       <label class="fl">Importance (1–20) — bubble size <span id="f-imp-val" style="color:var(--accent2);font-family:'JetBrains Mono',monospace">8</span></label>
       <input type="range" class="fi" id="f-imp" min="1" max="20" value="8" step="1" style="padding:0;accent-color:var(--accent);height:20px" oninput="document.getElementById('f-imp-val').textContent=this.value"/>
+    </div>
+    <div class="fg">
+      <label class="fl" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400">
+        <input type="checkbox" id="f-habit" style="width:16px;height:16px;accent-color:var(--accent)" onchange="togHabitFields()"/>
+        🔁 عادت روزانه — هر بار ثبتش کنم بزرگ‌تر بشه (به‌جای اینکه با یه تپ روی حباب تموم بشه)
+      </label>
+      <div id="habit-count-row" style="display:none;font-size:11px;color:var(--text3);margin-top:6px">تا الان <b id="f-habit-count" style="color:var(--accent2)">0</b> بار ثبت شده</div>
     </div>
     <div class="fg"><label class="fl">Description</label><textarea class="fta" id="f-desc" placeholder="Details, context, links..."></textarea></div>
     <div class="fr2">
@@ -742,6 +754,7 @@ function render(){
           <span class="badge ${t.type}">${tL(t.type)}</span>
           <span class="badge ${t.priority}">${pL(t.priority)}</span>
           ${t.status==='in-progress'?`<span class="badge inp">In Progress</span>`:''}
+          ${t.habit?`<button class="habit-btn" onclick="ev(event);habitTick(${t.id})">🔁 +۱ · ${t.habitCount||0}</button>`:''}
           ${t.recur?`<span class="recur-badge">🔁 ${t.recur}</span>`:''}
           ${t.due_date?dueBadge(t.due_date,t.status):''}
           ${(t.tags||[]).map(g=>`<span class="ttag">#${esc(g)}</span>`).join('')}
@@ -768,6 +781,12 @@ const IMPORTANCE_BY_PRI={urgent:18,high:13,medium:8,low:3};
 let bzDrops=[],bzRAF=null,bzT=0,bzActiveId=null,bzRevealTimer=null;
 
 function importanceOf(t){
+  if(t.habit){
+    // habit tasks grow their own bubble one step per log, starting from the priority baseline;
+    // the visual size plateaus at 20 but habitCount itself never resets or caps, so hover always shows the true total
+    const base=IMPORTANCE_BY_PRI[t.priority]||8;
+    return Math.max(1,Math.min(20,base+Math.round((t.habitCount||0)*0.9)));
+  }
   const n=t.importance;
   if(typeof n==='number'&&n>=1&&n<=20)return n;
   return IMPORTANCE_BY_PRI[t.priority]||8;
@@ -791,7 +810,8 @@ function setCaption(d){
     return;
   }
   cap.classList.remove('hint');
-  cap.innerHTML=`<span class="bz-cap-dot" style="background:var(--${d.priority})"></span>${esc(d.title)}`;
+  const habitBadge=d.habit?` · 🔁 ${d.habitCount||0} بار`:'';
+  cap.innerHTML=`<span class="bz-cap-dot" style="background:var(--${d.priority})"></span>${esc(d.title)}${habitBadge}`;
   bzActiveId=d.id;
   if(ring){
     // a halo just outside the drop's own edge — clearly marks it even when it's fused with its neighbors
@@ -831,7 +851,7 @@ function renderBubbles(){
     const ov=!!(t.due_date&&new Date(t.due_date)<new Date());
     const old=prev[t.id];
     return{
-      id:t.id,title:t.title,priority:t.priority||'medium',r,ov,
+      id:t.id,title:t.title,priority:t.priority||'medium',r,ov,habit:!!t.habit,habitCount:t.habitCount||0,
       x:old?Math.min(Math.max(old.x,r),Math.max(r,cw-r)):Math.random()*Math.max(1,cw-2*r)+r,
       y:old?Math.min(Math.max(old.y,r),Math.max(r,ch-r)):Math.random()*Math.max(1,ch-2*r)+r,
       vx:old?old.vx:(Math.random()-.5)*.3,
@@ -1387,6 +1407,17 @@ async function qTog(id){
   await fetch(`${API}/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:t.status==='done'?'todo':'done'})});
   toast(t.status!=='done'?'✓ Done!':'↩ Reopened');
 }
+// habit tasks: log one rep — grows the bubble a step, never completes/pops it, never resets
+async function habitTick(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  const n=(t.habitCount||0)+1;
+  t.habitCount=n; // optimistic, so the immediate revealBubble below already sees the new count
+  await fetch(`${API}/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({habitCount:n})});
+  toast(`🔥 ثبت شد — ${n} بار`);
+  renderBubbles();
+  if(viewTask&&viewTask.id===id)openDet(id);
+  setTimeout(()=>revealBubble(id),30);
+}
 async function delTask(){
   if(!viewTask||!confirm('Delete this task?'))return;
   await fetch(`${API}/api/tasks/${viewTask.id}`,{method:'DELETE'});
@@ -1400,6 +1431,11 @@ async function togDone(){
 }
 
 // ── Add / Edit ────────────────────────────────────────────────
+function togHabitFields(){
+  const on=document.getElementById('f-habit').checked;
+  document.getElementById('imp-fg').style.display=on?'none':'';
+  document.getElementById('habit-count-row').style.display=on?'':'none';
+}
 function openAdd(){
   editId=null;
   document.getElementById('m-add-t').textContent='New Task';
@@ -1415,6 +1451,9 @@ function openAdd(){
   selP('medium',document.querySelector('.pbtn.medium'));
   document.getElementById('f-imp').value=8;
   document.getElementById('f-imp-val').textContent='8';
+  document.getElementById('f-habit').checked=false;
+  document.getElementById('f-habit-count').textContent='0';
+  togHabitFields();
   document.getElementById('ai-sec').style.display='none';
   openM('m-add');setTimeout(()=>document.getElementById('f-title').focus(),300);
 }
@@ -1434,6 +1473,9 @@ function openEdit(){
   selP(t.priority,document.querySelector(`.pbtn.${t.priority}`));
   document.getElementById('f-imp').value=importanceOf(t);
   document.getElementById('f-imp-val').textContent=importanceOf(t);
+  document.getElementById('f-habit').checked=!!t.habit;
+  document.getElementById('f-habit-count').textContent=t.habitCount||0;
+  togHabitFields();
   document.getElementById('f-proj').value=t.project;
   if(t.ai_suggestion){document.getElementById('ai-sec').style.display='block';document.getElementById('ai-res').textContent=t.ai_suggestion}
   else document.getElementById('ai-sec').style.display='none';
@@ -1444,7 +1486,7 @@ async function saveTask(){
   if(!title){toast('⚠ Title required');return}
   const due=document.getElementById('f-due').value;
   const rem=document.getElementById('f-rem').value;
-  const body={title,description:document.getElementById('f-desc').value.trim(),type:selTval,priority:selPval,status:document.getElementById('f-status').value,project:document.getElementById('f-proj').value,tags:curTags,subtasks:curSubs,ai_suggestion:document.getElementById('ai-res').textContent||'',due_date:due?new Date(due).toISOString():null,reminder:rem?new Date(rem).toISOString():null,recur:document.getElementById('f-recur').value||null,importance:parseInt(document.getElementById('f-imp').value,10)||8};
+  const body={title,description:document.getElementById('f-desc').value.trim(),type:selTval,priority:selPval,status:document.getElementById('f-status').value,project:document.getElementById('f-proj').value,tags:curTags,subtasks:curSubs,ai_suggestion:document.getElementById('ai-res').textContent||'',due_date:due?new Date(due).toISOString():null,reminder:rem?new Date(rem).toISOString():null,recur:document.getElementById('f-recur').value||null,importance:parseInt(document.getElementById('f-imp').value,10)||8,habit:document.getElementById('f-habit').checked};
   if(editId)await fetch(`${API}/api/tasks/${editId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   else await fetch(`${API}/api/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   closeM('m-add');toast(editId?'✓ Updated':'✓ Task added');
@@ -1463,6 +1505,7 @@ function openDet(id){
       <span style="margin-left:auto;font-size:11px;color:var(--text3)">${esc(t.project)}</span>
     </div>
     <div class="det-title">${esc(t.title)}</div>
+    ${t.habit?`<div class="habit-box"><div><b>${t.habitCount||0}</b> بار ثبت شده — هر تپ حبابش رو تو Focus Bubbles یه‌ذره بزرگ‌تر می‌کنه</div><button class="btn btn-p" onclick="habitTick(${t.id})">🔁 امروز انجامش دادم (+۱)</button></div>`:''}
     ${t.description?`<div class="det-desc">${esc(t.description)}</div>`:''}
     ${t.ai_suggestion?`<div class="aih" style="margin:0 0 12px">${esc(t.ai_suggestion)}</div>`:''}
     ${subs.length?`<div class="det-subs"><div class="det-subs-t">Sub-tasks (${subs.filter(s=>s.done).length}/${subs.length})</div>${subs.map((s,i)=>`<div class="sub-item"><div class="sub-chk ${s.done?'chk':''}" onclick="togDetSub(${i})"></div><span class="sub-t ${s.done?'done':''}">${esc(s.title)}</span></div>`).join('')}</div>`:''}
