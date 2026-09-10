@@ -83,13 +83,16 @@
     .stat-l{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
 
     /* Bubble focus zone */
-    #bzone{border-bottom:1px solid var(--border);background:var(--bg2);padding:10px 20px 12px}
+    .bz-zones-wrap{display:flex;gap:14px;border-bottom:1px solid var(--border);background:var(--bg2);padding:10px 20px 12px}
+    .bz-zones-wrap .bz-zone{flex:1;min-width:0;border-bottom:none;background:transparent;padding:0}
+    .bz-zones-wrap .bz-zone:first-child{border-left:1px solid var(--border);padding-left:14px}
+    .bz-zone{border-bottom:1px solid var(--border);background:var(--bg2);padding:10px 20px 12px}
     .bz-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
     .bz-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px}
     .bz-count{font-size:10px;color:var(--text3);background:var(--bg4);padding:1px 7px;border-radius:10px}
     .bz-toggle{margin-left:auto;background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px}
     .bz-toggle:hover{color:var(--text2)}
-    #bzone.collapsed .bz-row,#bzone.collapsed .bz-caption{display:none}
+    .bz-zone.collapsed .bz-row,.bz-zone.collapsed .bz-caption{display:none}
     .bz-row{position:relative;height:340px;overflow:hidden;border-radius:var(--r);margin-top:4px;
       background:radial-gradient(ellipse at 30% 20%,rgba(124,106,247,.1),transparent 55%),radial-gradient(ellipse at 75% 80%,rgba(124,106,247,.06),transparent 55%),var(--bg3)}
     .bz-empty{font-size:12px;color:var(--text3);padding:10px 4px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -337,8 +340,11 @@
       #qa-bar{min-width:90vw}
       #dashboard{padding:16px}
       .dash-grid{grid-template-columns:1fr 1fr}
-      #bzone{padding:8px 14px 10px}
+      .bz-zone{padding:8px 14px 10px}
       .bz-row{height:260px}
+      .bz-zones-wrap{flex-direction:column;padding:8px 14px 10px;gap:0}
+      .bz-zones-wrap .bz-zone{padding:0}
+      .bz-zones-wrap .bz-zone:first-child{border-left:none;padding-left:0;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:8px}
     }
     .tc{animation:fup .18s ease}
     @keyframes fup{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -449,21 +455,39 @@
     <div class="stat" onclick="setView('overdue',document.querySelector('[data-v=overdue]'))"><div class="stat-n" style="color:var(--overdue)" id="s-ov">0</div><div class="stat-l">Overdue</div></div>
     <div class="stat" onclick="setView('done',document.querySelector('[data-v=done]'))"><div class="stat-n" style="color:var(--done)" id="s-pct">0%</div><div class="stat-l">Done</div></div>
   </div>
-  <div id="bzone">
-    <div class="bz-head">
-      <span class="bz-title">✦ Focus Bubbles</span>
-      <span class="bz-count" id="bz-count">0</span>
-      <span class="bz-more" id="bz-more"></span>
-      <button class="bz-toggle" onclick="togBz()" id="bz-toggle-btn">Hide</button>
+  <div class="bz-zones-wrap">
+    <div id="bzzone" class="bz-zone">
+      <div class="bz-head">
+        <span class="bz-title">✦ Focus Bubbles</span>
+        <span class="bz-count" id="bz-count">0</span>
+        <span class="bz-more" id="bz-more"></span>
+        <button class="bz-toggle" onclick="toggleGroup(BZ)" id="bz-toggle-btn">Hide</button>
+      </div>
+      <div class="bz-row" id="bz-row">
+        <div class="bz-goo" id="bz-goo"></div>
+        <div class="bz-gloss" id="bz-gloss"></div>
+        <div class="bz-label" id="bz-label"></div>
+        <div class="bz-hi" id="bz-hi"><div class="ring"></div></div>
+        <div class="bz-hit" id="bz-hit"></div>
+      </div>
+      <div class="bz-caption hint" id="bz-caption">یه قطره رو لمس/هاور کن تا اسم تسکش رو ببینی — تپ کن تا انجام‌شده بشه</div>
     </div>
-    <div class="bz-row" id="bz-row">
-      <div class="bz-goo" id="bz-goo"></div>
-      <div class="bz-gloss" id="bz-gloss"></div>
-      <div class="bz-label" id="bz-label"></div>
-      <div class="bz-hi" id="bz-hi"><div class="ring"></div></div>
-      <div class="bz-hit" id="bz-hit"></div>
+    <div id="hzzone" class="bz-zone">
+      <div class="bz-head">
+        <span class="bz-title">🔁 Habit Bubbles</span>
+        <span class="bz-count" id="hz-count">0</span>
+        <span class="bz-more" id="hz-more"></span>
+        <button class="bz-toggle" onclick="toggleGroup(HZ)" id="hz-toggle-btn">Hide</button>
+      </div>
+      <div class="bz-row" id="hz-row">
+        <div class="bz-goo" id="hz-goo"></div>
+        <div class="bz-gloss" id="hz-gloss"></div>
+        <div class="bz-label" id="hz-label"></div>
+        <div class="bz-hi" id="hz-hi"><div class="ring"></div></div>
+        <div class="bz-hit" id="hz-hit"></div>
+      </div>
+      <div class="bz-caption hint" id="hz-caption">یه قطره رو لمس/هاور کن — تپ کن تا رشد کنه (هیچ‌وقت نمی‌ترکه)</div>
     </div>
-    <div class="bz-caption hint" id="bz-caption">یه قطره رو لمس/هاور کن تا اسم تسکش رو ببینی</div>
   </div>
   <div class="fbar">
     <button class="chip active" onclick="setPri('',this)">All</button>
@@ -650,7 +674,6 @@ let ws,tasks=[],projects=[],viewTask=null,editId=null;
 let selTval='feature',selPval='medium',curTags=[],curSubs=[],selClr='#6366f1';
 let flt={view:'all',type:'',pri:'',search:''};
 let sortM='priority';
-let bzOpen=true;
 const COLORS=['#6366f1','#8b5cf6','#ec4899','#f43f5e','#f97316','#eab308','#22c55e','#14b8a6','#0ea5e9','#64748b'];
 
 // drag state
@@ -764,7 +787,8 @@ function render(){
 
     </div>`}).join('');
   updCounts();
-  renderBubbles();
+  renderGroup(BZ);
+  renderGroup(HZ);
 }
 
 function dueBadge(due,status){
@@ -776,9 +800,8 @@ function dueBadge(due,status){
 }
 
 // ── Focus Bubbles (packed under pressure) ───────────────────────
-const BZ_MIN_D=36, BZ_MAX_D=104, BZ_CAP=30;
+const BZ_MIN_D=36, BZ_MAX_D=104;
 const IMPORTANCE_BY_PRI={urgent:18,high:13,medium:8,low:3};
-let bzDrops=[],bzRAF=null,bzT=0,bzActiveId=null,bzRevealTimer=null;
 
 function importanceOf(t){
   if(t.habit){
@@ -797,22 +820,41 @@ function bzShortTitle(title){
   return (title||'').trim().split(/\s+/).filter(Boolean).slice(0,2).join(' ');
 }
 
-function bzRing(){return document.querySelector('#bz-hi .ring')}
+// Two independent bubble panels sharing the same liquid-goo mechanics:
+// BZ = regular tasks (tap a bubble → completes it, with undo)
+// HZ = habit tasks   (tap a bubble → grows it one step, never completes/pops)
+function makeGroup(cfg){
+  return Object.assign({drops:[],raf:null,t:0,activeId:null,revealTimer:null,open:true},cfg);
+}
+const BZ=makeGroup({
+  key:'bz',cap:30,mode:'pop',
+  filter:t=>t.status!=='done'&&!t.habit,
+  emptyMsg:'هیچ تسک بازی نیست ✦',
+  hintMsg:'یه قطره رو لمس/هاور کن تا اسم تسکش رو ببینی — تپ کن تا انجام‌شده بشه'
+});
+const HZ=makeGroup({
+  key:'hz',cap:12,mode:'grow',
+  filter:t=>t.status!=='done'&&!!t.habit,
+  emptyMsg:'هنوز عادتی نساختی — از فرم تسک «عادت روزانه» رو تیک بزن ✦',
+  hintMsg:'یه قطره رو لمس/هاور کن — تپ کن تا رشد کنه (هیچ‌وقت نمی‌ترکه)'
+});
 
-function setCaption(d){
-  const cap=document.getElementById('bz-caption');
-  const ring=bzRing();
+function groupRing(g){return document.querySelector(`#${g.key}-hi .ring`)}
+
+function setGroupCaption(g,d){
+  const cap=document.getElementById(`${g.key}-caption`);
+  const ring=groupRing(g);
   if(!cap)return;
   if(!d){
-    cap.classList.add('hint');cap.textContent='یه قطره رو لمس/هاور کن تا اسم تسکش رو ببینی';
-    bzActiveId=null;
+    cap.classList.add('hint');cap.textContent=g.hintMsg;
+    g.activeId=null;
     if(ring)ring.classList.remove('on');
     return;
   }
   cap.classList.remove('hint');
   const habitBadge=d.habit?` · 🔁 ${d.habitCount||0} بار`:'';
   cap.innerHTML=`<span class="bz-cap-dot" style="background:var(--${d.priority})"></span>${esc(d.title)}${habitBadge}`;
-  bzActiveId=d.id;
+  g.activeId=d.id;
   if(ring){
     // a halo just outside the drop's own edge — clearly marks it even when it's fused with its neighbors
     const size=d.r*2+10;
@@ -823,29 +865,30 @@ function setCaption(d){
   }
 }
 
-function renderBubbles(){
-  const row=document.getElementById('bz-row');
-  const goo=document.getElementById('bz-goo'), gloss=document.getElementById('bz-gloss'), label=document.getElementById('bz-label'), hit=document.getElementById('bz-hit');
-  const countEl=document.getElementById('bz-count'), moreEl=document.getElementById('bz-more');
+function renderGroup(g){
+  const row=document.getElementById(`${g.key}-row`);
+  const goo=document.getElementById(`${g.key}-goo`), gloss=document.getElementById(`${g.key}-gloss`),
+        label=document.getElementById(`${g.key}-label`), hit=document.getElementById(`${g.key}-hit`);
+  const countEl=document.getElementById(`${g.key}-count`), moreEl=document.getElementById(`${g.key}-more`);
   if(!row||!goo)return;
-  const w=[...tasks].filter(t=>t.status!=='done');
+  const w=[...tasks].filter(g.filter);
   w.sort((a,b)=>{
     const ao=a.due_date&&new Date(a.due_date)<new Date()?-1:0;
     const bo=b.due_date&&new Date(b.due_date)<new Date()?-1:0;
     return ao-bo||importanceOf(b)-importanceOf(a)||new Date(b.created_at)-new Date(a.created_at);
   });
-  const top=w.slice(0,BZ_CAP);
-  countEl.textContent=w.length;
+  const top=w.slice(0,g.cap);
+  if(countEl)countEl.textContent=w.length;
   if(moreEl)moreEl.textContent=w.length>top.length?`${top.length} تای مهم‌تر اینجا، ${w.length-top.length} تای دیگه توی لیست`:'';
   row.querySelectorAll('.bz-empty').forEach(e=>e.remove());
   if(!top.length){
-    stopBzSim();bzDrops=[];goo.innerHTML='';gloss.innerHTML='';label.innerHTML='';hit.innerHTML='';
-    row.insertAdjacentHTML('beforeend','<div class="bz-empty">هیچ تسک بازی نیست ✦</div>');
-    setCaption(null);return;
+    stopGroupSim(g);g.drops=[];goo.innerHTML='';gloss.innerHTML='';label.innerHTML='';hit.innerHTML='';
+    row.insertAdjacentHTML('beforeend',`<div class="bz-empty">${g.emptyMsg}</div>`);
+    setGroupCaption(g,null);return;
   }
   const cw=row.clientWidth||320, ch=row.clientHeight||260;
-  const prev={};bzDrops.forEach(d=>prev[d.id]=d);
-  bzDrops=top.map(t=>{
+  const prev={};g.drops.forEach(d=>prev[d.id]=d);
+  g.drops=top.map(t=>{
     const imp=importanceOf(t);
     const r=(BZ_MIN_D+(imp-1)/19*(BZ_MAX_D-BZ_MIN_D))/2;
     const ov=!!(t.due_date&&new Date(t.due_date)<new Date());
@@ -859,45 +902,45 @@ function renderBubbles(){
       ph:old?old.ph:Math.random()*Math.PI*2
     };
   });
-  goo.innerHTML=bzDrops.map(d=>`<div class="blob p-${d.priority} ${d.ov?'b-ov':''}" data-id="${d.id}" style="width:${d.r*2}px;height:${d.r*2}px"></div>`).join('');
-  gloss.innerHTML=bzDrops.map(d=>`<div class="shine b" data-sid="${d.id}" style="width:${(d.r*.9).toFixed(1)}px;height:${(d.r*.6).toFixed(1)}px"></div><div class="shine" data-sid2="${d.id}" style="width:${(d.r*.22).toFixed(1)}px;height:${(d.r*.14).toFixed(1)}px"></div>`).join('');
-  label.innerHTML=bzDrops.map(d=>{
+  goo.innerHTML=g.drops.map(d=>`<div class="blob p-${d.priority} ${d.ov?'b-ov':''}" data-id="${d.id}" style="width:${d.r*2}px;height:${d.r*2}px"></div>`).join('');
+  gloss.innerHTML=g.drops.map(d=>`<div class="shine b" data-sid="${d.id}" style="width:${(d.r*.9).toFixed(1)}px;height:${(d.r*.6).toFixed(1)}px"></div><div class="shine" data-sid2="${d.id}" style="width:${(d.r*.22).toFixed(1)}px;height:${(d.r*.14).toFixed(1)}px"></div>`).join('');
+  label.innerHTML=g.drops.map(d=>{
     const fs=Math.max(7,Math.min(11,d.r*0.23)).toFixed(1);
     return `<div class="bz-lbl" data-tid="${d.id}" style="width:${d.r*2}px;height:${d.r*2}px;font-size:${fs}px"><span>${esc(bzShortTitle(d.title))}</span></div>`;
   }).join('');
-  hit.innerHTML=bzDrops.map(d=>`<div class="bz-hit-c" data-hid="${d.id}" title="${esc(d.title)}" style="width:${d.r*2}px;height:${d.r*2}px"></div>`).join('');
-  bzDrops.forEach(d=>{
+  hit.innerHTML=g.drops.map(d=>`<div class="bz-hit-c" data-hid="${d.id}" title="${esc(d.title)}" style="width:${d.r*2}px;height:${d.r*2}px"></div>`).join('');
+  g.drops.forEach(d=>{
     d.elBlob=goo.querySelector(`[data-id="${d.id}"]`);
     d.elShineB=gloss.querySelector(`[data-sid="${d.id}"]`);
     d.elShineS=gloss.querySelector(`[data-sid2="${d.id}"]`);
     d.elLabel=label.querySelector(`[data-tid="${d.id}"]`);
     d.elHit=hit.querySelector(`[data-hid="${d.id}"]`);
     if(d.elHit){
-      d.elHit.onclick=()=>popBubble(d.id);
-      d.elHit.onmouseenter=()=>setCaption(d);
-      d.elHit.onmouseleave=()=>{if(bzActiveId===d.id)setCaption(null)};
-      d.elHit.addEventListener('touchstart',()=>setCaption(d),{passive:true});
+      d.elHit.onclick=()=>tapGroup(g,d.id);
+      d.elHit.onmouseenter=()=>setGroupCaption(g,d);
+      d.elHit.onmouseleave=()=>{if(g.activeId===d.id)setGroupCaption(g,null)};
+      d.elHit.addEventListener('touchstart',()=>setGroupCaption(g,d),{passive:true});
     }
     const bx=(d.x-d.r).toFixed(1), by=(d.y-d.r).toFixed(1);
     if(d.elBlob)d.elBlob.style.transform=`translate(${bx}px,${by}px)`;
     if(d.elLabel)d.elLabel.style.transform=`translate(${bx}px,${by}px)`;
     if(d.elHit)d.elHit.style.transform=`translate(${bx}px,${by}px)`;
   });
-  if(bzActiveId!==null&&!bzDrops.some(d=>d.id===bzActiveId))setCaption(null);
-  startBzSim();
+  if(g.activeId!==null&&!g.drops.some(d=>d.id===g.activeId))setGroupCaption(g,null);
+  startGroupSim(g);
 }
 
-function stopBzSim(){if(bzRAF){cancelAnimationFrame(bzRAF);bzRAF=null}}
+function stopGroupSim(g){if(g.raf){cancelAnimationFrame(g.raf);g.raf=null}}
 
-function startBzSim(){
-  stopBzSim();
-  const row=document.getElementById('bz-row');
+function startGroupSim(g){
+  stopGroupSim(g);
+  const row=document.getElementById(`${g.key}-row`);
   if(!row)return;
   function tick(){
-    bzRAF=requestAnimationFrame(tick);
-    bzT+=1;
-    if(!bzOpen||!bzDrops.length)return;
-    const live=bzDrops.filter(d=>!d.popping);
+    g.raf=requestAnimationFrame(tick);
+    g.t+=1;
+    if(!g.open||!g.drops.length)return;
+    const live=g.drops.filter(d=>!d.popping);
     if(!live.length)return;
     const cw=row.clientWidth||320, ch=row.clientHeight||260;
     const cx=cw/2, cy=ch/2;
@@ -928,14 +971,14 @@ function startBzSim(){
       d.x=Math.max(d.r,Math.min(cw-d.r,d.x));
       d.y=Math.max(d.r,Math.min(ch-d.r,d.y));
       // gentle jelly squash/stretch so it reads as liquid, not a rigid ball
-      const wob=1+Math.sin(bzT*0.05+d.ph)*0.045;
+      const wob=1+Math.sin(g.t*0.05+d.ph)*0.045;
       const sx=wob.toFixed(3), sy=(2-wob).toFixed(3);
       const bx=(d.x-d.r).toFixed(1), by=(d.y-d.r).toFixed(1);
       if(d.elBlob){
         d.elBlob.style.transform=`translate(${bx}px,${by}px) scale(${sx},${sy})`;
         // irregular, continuously-morphing border radius — a droplet's outline never sits still
-        const r1=50+Math.sin(bzT*0.021+d.ph)*14, r2=50+Math.sin(bzT*0.026+d.ph+1.3)*14;
-        const r3=50+Math.sin(bzT*0.018+d.ph+2.6)*14, r4=50+Math.sin(bzT*0.024+d.ph+4.1)*14;
+        const r1=50+Math.sin(g.t*0.021+d.ph)*14, r2=50+Math.sin(g.t*0.026+d.ph+1.3)*14;
+        const r3=50+Math.sin(g.t*0.018+d.ph+2.6)*14, r4=50+Math.sin(g.t*0.024+d.ph+4.1)*14;
         d.elBlob.style.borderRadius=`${r1.toFixed(0)}% ${(100-r1).toFixed(0)}% ${r3.toFixed(0)}% ${(100-r3).toFixed(0)}% / ${r2.toFixed(0)}% ${r4.toFixed(0)}% ${(100-r4).toFixed(0)}% ${(100-r2).toFixed(0)}%`;
       }
       if(d.elHit)d.elHit.style.transform=`translate(${bx}px,${by}px)`;
@@ -948,8 +991,8 @@ function startBzSim(){
         const sh2x=(d.x-d.r*0.18).toFixed(1), sh2y=(d.y-d.r*0.7).toFixed(1);
         d.elShineS.style.transform=`translate(${sh2x}px,${sh2y}px)`;
       }
-      if(bzActiveId===d.id){
-        const ring=bzRing();
+      if(g.activeId===d.id){
+        const ring=groupRing(g);
         if(ring){
           const size=d.r*2+10;
           const rx=(d.x-size/2).toFixed(1), ry=(d.y-size/2).toFixed(1);
@@ -958,12 +1001,18 @@ function startBzSim(){
       }
     });
   }
-  bzRAF=requestAnimationFrame(tick);
+  g.raf=requestAnimationFrame(tick);
 }
 
-// pop a drop → mark task done, with a few seconds to undo
-function popBubble(id){
-  const d=bzDrops.find(x=>x.id===id);
+// tapping a bubble: regular tasks pop/complete, habit tasks just grow
+function tapGroup(g,id){
+  if(g.mode==='grow')habitTick(id);
+  else popBubble(g,id);
+}
+
+// pop a drop → mark task done, with a few seconds to undo (BZ group only)
+function popBubble(g,id){
+  const d=g.drops.find(x=>x.id===id);
   if(!d||d.popping)return;
   const t=tasks.find(x=>x.id===id);
   if(!t||t.status==='done')return;
@@ -983,7 +1032,7 @@ function popBubble(id){
       if(d.elLabel)d.elLabel.style.opacity='0';
     });
   }
-  setCaption(null);
+  setGroupCaption(g,null);
   setTimeout(async()=>{
     try{
       await fetch(`${API}/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});
@@ -1010,28 +1059,31 @@ async function undoDone(id){
   }catch{}
 }
 
-function togBz(){
-  bzOpen=!bzOpen;
-  document.getElementById('bzone').classList.toggle('collapsed',!bzOpen);
-  document.getElementById('bz-toggle-btn').textContent=bzOpen?'Hide':'Show';
+function toggleGroup(g){
+  g.open=!g.open;
+  const zone=document.getElementById(`${g.key}zone`);
+  if(zone)zone.classList.toggle('collapsed',!g.open);
+  const btn=document.getElementById(`${g.key}-toggle-btn`);
+  if(btn)btn.textContent=g.open?'Hide':'Show';
 }
 
-// point out a task's bubble in the Focus Bubbles panel (ring + caption), used when a task is selected in the list
-function revealBubble(id){
-  const d=bzDrops.find(x=>x.id===id);
+// point out a task's bubble in its panel (ring + caption), used when a task is selected in the list
+function revealInGroup(g,id){
+  const d=g.drops.find(x=>x.id===id);
   if(!d)return false;
-  if(!bzOpen)togBz();
-  const bzone=document.getElementById('bzone');
-  if(bzone)bzone.scrollIntoView({behavior:'smooth',block:'center'});
-  setCaption(d);
-  clearTimeout(bzRevealTimer);
-  bzRevealTimer=setTimeout(()=>{if(bzActiveId===id)setCaption(null)},4000);
+  if(!g.open)toggleGroup(g);
+  const zone=document.getElementById(`${g.key}zone`);
+  if(zone)zone.scrollIntoView({behavior:'smooth',block:'center'});
+  setGroupCaption(g,d);
+  clearTimeout(g.revealTimer);
+  g.revealTimer=setTimeout(()=>{if(g.activeId===id)setGroupCaption(g,null)},4000);
   return true;
 }
 
-// selecting a task from the list: flash its bubble first, then open the detail sheet
+// selecting a task from the list: flash its bubble (in whichever panel it lives) first, then open the detail sheet
 function selectTask(id){
-  if(revealBubble(id))setTimeout(()=>openDet(id),480);
+  const g=BZ.drops.some(d=>d.id===id)?BZ:(HZ.drops.some(d=>d.id===id)?HZ:null);
+  if(g&&revealInGroup(g,id))setTimeout(()=>openDet(id),480);
   else openDet(id);
 }
 
@@ -1407,16 +1459,22 @@ async function qTog(id){
   await fetch(`${API}/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:t.status==='done'?'todo':'done'})});
   toast(t.status!=='done'?'✓ Done!':'↩ Reopened');
 }
-// habit tasks: log one rep — grows the bubble a step, never completes/pops it, never resets
+// habit tasks: log one rep — grows the HZ bubble a step, never completes/pops it, never resets
 async function habitTick(id){
   const t=tasks.find(t=>t.id===id);if(!t)return;
   const n=(t.habitCount||0)+1;
-  t.habitCount=n; // optimistic, so the immediate revealBubble below already sees the new count
+  t.habitCount=n; // optimistic, so the immediate revealInGroup below already sees the new count
   await fetch(`${API}/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({habitCount:n})});
   toast(`🔥 ثبت شد — ${n} بار`);
-  renderBubbles();
+  renderGroup(HZ);
+  const d=HZ.drops.find(x=>x.id===id);
+  if(d&&d.elBlob){
+    // a quick brightness flash as tactile "grew!" feedback, independent of the per-frame transform/goo updates
+    d.elBlob.style.transition='none';d.elBlob.style.filter='brightness(1.8)';
+    requestAnimationFrame(()=>{d.elBlob.style.transition='filter .5s ease';d.elBlob.style.filter='';});
+  }
   if(viewTask&&viewTask.id===id)openDet(id);
-  setTimeout(()=>revealBubble(id),30);
+  setTimeout(()=>revealInGroup(HZ,id),30);
 }
 async function delTask(){
   if(!viewTask||!confirm('Delete this task?'))return;
