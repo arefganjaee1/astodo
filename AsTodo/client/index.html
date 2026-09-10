@@ -1473,7 +1473,10 @@ async function habitTick(id){
     d.elBlob.style.transition='none';d.elBlob.style.filter='brightness(1.8)';
     requestAnimationFrame(()=>{d.elBlob.style.transition='filter .5s ease';d.elBlob.style.filter='';});
   }
-  if(viewTask&&viewTask.id===id)openDet(id);
+  // only refresh the detail sheet's content if it's actually open right now for this task — viewTask stays
+  // set to the last-viewed task even after closing the sheet, so checking viewTask alone would force it back open
+  const detSheetOpen=document.getElementById('m-det').classList.contains('open');
+  if(detSheetOpen&&viewTask&&viewTask.id===id)openDet(id);
   setTimeout(()=>revealInGroup(HZ,id),30);
 }
 async function delTask(){
